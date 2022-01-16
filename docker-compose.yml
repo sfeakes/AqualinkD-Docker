@@ -1,0 +1,17 @@
+version: '3.2'
+
+services:
+  aqualinkd:
+    build:
+      context: https://github.com/sfeakes/AqualinkD-Docker.git#main
+    ports:
+      - "8080:80"
+    volumes:
+      - type: bind
+        source: ./aqualinkd.conf
+        target: /aquacfg/aqualinkd.conf
+        read_only: true
+    environment:
+      config: /aquacfg/aqualinkd.conf
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
