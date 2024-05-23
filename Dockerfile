@@ -50,12 +50,12 @@ WORKDIR /home/AqualinkD
 # Use local
 #COPY . /home/AqualinkD
 
-# Use remote latest release version
-RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1
+# Use github latest release version
+#RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1
 
-# Use remote latest
-#WORKDIR /home/
-#RUN git clone https://api.github.com/repos/sfeakes/AqualinkD/releases/latest
+# Use githum latest 
+WORKDIR /home/
+RUN git clone https://api.github.com/repos/sfeakes/AqualinkD/releases/latest
 
 WORKDIR /home/AqualinkD
 
