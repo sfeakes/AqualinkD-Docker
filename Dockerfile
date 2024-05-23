@@ -101,7 +101,7 @@ COPY --from=aqualinkd-build /home/AqualinkD/release/serial_logger /usr/local/bin
 COPY --from=aqualinkd-build /home/AqualinkD/web/ /var/www/aqualinkd/
 COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd.conf /etc/aqualinkd.conf
 
-COPY ./extras/aqualinkd-docker.cmd /usr/local/bin/aqualinkd-docker
+COPY --from=aqualinkd-build ./home/AqualinkD/aqualinkd-docker.cmd /usr/local/bin/aqualinkd-docker
 
 CMD ["sh", "-c", "/usr/local/bin/aqualinkd-docker"]
 
