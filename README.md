@@ -1,4 +1,12 @@
 # AqualinkD-Docker
+
+Please see the AqualinkD wiki docker section for how to build / deploy AqualinkD with a docker.
+[Wiki - Docker](https://github.com/sfeakes/AqualinkD/wiki#Docker)
+
+This repo simply holds docker development tools for AqualinkD and no documentation provided. look / play / re-use anything here as you desire.
+
+<!--
+
 Docker info for Aqualinkd  
 Please note this not not the best way to run AqualinkD, you are far better off downloading the git repo and running make & make install on your system. (information on this is in the AqualinkD wiki)
 
@@ -69,6 +77,8 @@ The build and run commands are in the build.cmd & run.cmd files in the repo as w
 
 That will get you to the point where you need to read the AqualinkD wiki about configuration.
 You will obviously need to change /dev/ttyUSB0 and -p8080:80 to what ever port you want to map.
+
+-->
 
 
 
