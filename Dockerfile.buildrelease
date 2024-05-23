@@ -1,0 +1,82 @@
+
+#####################################
+#
+# Build container for buildx
+#
+# Enable multi platform
+# docker buildx create --use --platform=linux/arm64,linux/arm/v7,linux/amd64 --name multi-platform-builder
+# docker buildx inspect --bootstrap
+#
+# Build
+# docker buildx build --platform=linux/amd64,linux/arm/v7,linux/arm64 --output=./crap --file /Dockerfile.buildrelease  .
+# docker buildx build --platform=linux/amd64,linux/arm/v7,linux/arm64  --file Dockerfile.buildrelease .
+# adding --progress=plain helps with debug
+#
+# Clean the build env and start again
+# docker buildx prune
+#
+#####################################
+
+#FROM --platform=$BUILDPLATFORM gcc:12-bookworm AS aqualinkd-releasebuild
+FROM --platform=$BUILDPLATFORM gcc:8.4.0 AS aqualinkd-releasebuild
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG BUILDVARIANT
+ARG BUILDOS
+ARG BUILDARCH
+ARG TARGETOS
+ARG TARGETARCH
+
+
+ARG AQUALINKD_VERSION=2.3.4.dev
+#ARG AQUALINKD_VERSION
+#ARG AQUALINKD_SOURCE
+
+# Print all buildx variables 
+RUN echo "Build Platform $BUILDPLATFORM"
+RUN echo "Target Platform $TARGETPLATFORM"
+RUN echo "Build Veriant $BUILDVARIANT"
+RUN echo "Build OS $BUILDOS"
+RUN echo "Build Arch $BUILDARCH"
+RUN echo "Tagert OS $TARGETOS"
+RUN echo "Target Arch $TARGETARCH"
+
+#RUN test -n "$AQUALINKD_VERSION" || (echo "AQUALINKD_VERSION not set" && false)
+#RUN test -n "$AQUALINKD_SOURCE" || (echo "AQUALINKD_SOURCE not set" && false)
+
+#VOLUME ["/aqualinkd-build"]
+
+RUN apt-get update && \
+    apt-get -y install libsystemd-dev
+
+
+# Get a specific version
+RUN mkdir /home/AqualinkD
+COPY . /home/AqualinkD
+WORKDIR /home/AqualinkD
+
+
+RUN gcc --version
+RUN uname -a
+
+#run make clean
+#RUN make container
+
+RUN ls -al /home/AqualinkD/release/aqualinkd
+
+
+#####################################
+#
+# Runtime container
+#
+#####################################
+
+FROM scratch AS binaries
+
+ARG TARGETARCH
+ARG AQUALINKD_VERSION
+
+#COPY --from=aqualinkd-releasebuild /home/AqualinkD/release/aqualinkd /aqualinkd-$AQUALINKD_VERSION-$TARGETARCH
+
+COPY --from=aqualinkd-releasebuild /home/AqualinkD/release/aqualinkd /usr/local/bin/aqualinkd
