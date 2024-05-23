@@ -7,3 +7,4 @@ build.cmd
 docker.token
 *.token
 run.cmd
+tmp*

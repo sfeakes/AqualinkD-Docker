@@ -1,5 +1,0 @@
-#***** AUTO GENERATED DO NOT EDIT *****
-PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-15 21 * * * root curl -s -S --show-error -o /dev/null localhost:80/api/Aux_1/set -d value=1 -X PUT
-17 21 * * * root curl -s -S --show-error -o /dev/null localhost:80/api/Aux_1/set -d value=0 -X PUT
-#***** AUTO GENERATED DO NOT EDIT *****
