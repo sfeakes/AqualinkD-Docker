@@ -1,0 +1,9 @@
+AqualinkD-source
+commands.txt
+scratch
+aquaconf
+build.cmd
+.docker.token
+docker.token
+*.token
+run.cmd

@@ -1,0 +1,8 @@
+
+services:
+  gcc:
+    #image: sfeakes/aqualinkd:latest
+    image: gcc:12-bookworm
+    #build:
+      #context: https://github.com/sfeakes/AqualinkD-Docker.git#main
+    

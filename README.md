@@ -4,7 +4,12 @@ Please note this not not the best way to run AqualinkD, you are far better off d
 
 ## Very quick information of running AqualinkD with docker ##
 
-### This should be considered beta at present ###
+
+# Below is out of date, please see AqualinkD wiki for information #
+
+### This should be considered pre-release / beta at present ###
+First you will need access to the USB2RS485 adapter, If you’re running Linux, this is as simple as adding --device /dev/ttyUSBx to the docker run command. It’s not that simple on OSX or Windows. That’s because the docker daemon only runs natively on Linux. For other operating systems it is run in a hypervisor or virtual machine. In order to expose the port to the container, you first have to expose it to the virtual machine / hypervisor where Docker is running. Unfortunately that's not possible under OSX, and seems to have lots of problems with windows. Since it is absilutly imperitive for AqualinkD to have a very solid and fast connection to the USB2RS485 adapter, <b>it is not advised to run AqualinkD in a docker on any OS other than linux.</b>
+
 The information below will let you create a docker image to run, I'm not going to go into all the details as to why I'm not deploying a container.  So this will be a little more involved if you've only consumed other peoples containers before.
 
 All files you need are in this repo.  First thing you need is to get the `docker-compose.yml` & `aqualinkd.conf` file, then you can build the image, once built you can then run the image like you would any other container.

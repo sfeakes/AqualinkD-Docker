@@ -1,0 +1,82 @@
+
+#####################################
+#
+# Build container
+#
+#####################################
+
+FROM alpine:3.19 AS aqualinkd
+
+ARG AQUALINKD_VERSION
+
+RUN test -n "$AQUALINKD_VERSION" || (echo "AQUALINKD_VERSION not set" && false)
+
+RUN apk update && \
+    apk add build-base libsystem-dev
+
+
+# Get a specific version
+RUN mkdir /home/AqualinkD
+WORKDIR /home/AqualinkD
+#RUN curl --silent -L "https://github.com/sfeakes/AqualinkD/archive/refs/tags/v"$AQUALINKD_VERSION".tar.gz" | tar xz --strip-components=1
+
+RUN curl --silent -L "https://github.com/sfeakes/AqualinkD/archive/refs/heads/Simulator-dev.tar.gz" | tar xz --strip-components=1
+
+# Or get letest dev using below.
+#WORKDIR /home
+#RUN git clone https://github.com/sfeakes/AqualinkD.git
+
+
+WORKDIR /home/AqualinkD
+RUN make container
+
+RUN ls -al /home/AqualinkD/release/aqualinkd
+RUN pwd
+
+#####################################
+#
+# Runtime container
+#
+#####################################
+
+FROM alpine:3.19 AS aqualinkd
+
+ARG AQUALINKD_VERSION
+
+# Add CRON to distro
+RUN apk update && \
+    apk add --no-cache tini
+
+# Add Open Container Initiative (OCI) annotations.
+# See: https://github.com/opencontainers/image-spec/blob/main/annotations.md
+LABEL org.opencontainers.image.title="AqualinkD"
+LABEL org.opencontainers.image.url="https://hub.docker.com/repository/docker/sfeakes/aqualinkd/general"
+LABEL org.opencontainers.image.source="https://github.com/sfeakes/AqualinkD"
+#LABEL org.opencontainers.image.source="https://github.com/sfeakes/AqualinkD-Docker"
+LABEL org.opencontainers.image.documentation="https://github.com/sfeakes/AqualinkD"
+LABEL org.opencontainers.image.version=$AQUALINKD_VERSION
+
+
+COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd /usr/local/bin/aqualinkd                        
+COPY --from=aqualinkd-build /home/AqualinkD/release/serial_logger /usr/local/bin/serial_logger
+COPY --from=aqualinkd-build /home/AqualinkD/web/ /var/www/aqualinkd/
+
+
+#WORKDIR ./release
+#CMD ["sh", "-c", "/usr/local/bin/aqualinkd -d -c ${config}"]
+
+# Add Tini
+#ENV TINI_VERSION v0.19.0
+#ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+#RUN chmod +x /tini
+#ENTRYPOINT ["/tini", "--"]
+
+#CMD ["/usr/local/bin/aqualinkd -c ${config}"]
+
+#RUN /lib/systemd/systemd-journald &
+CMD ["sh", "-c", "/usr/local/bin/aqualinkd -d -ns -c ${config}"]
+
+#CMD ["sh", "-c", "/lib/systemd/systemd-journald & /usr/local/bin/aqualinkd -d -c ${config}"]
+
+#CMD [ "/lib/systemd/systemd", "log-level=info", "unit=sysinit.target" ]
+#CMD [ "/sbin/init" ]
