@@ -55,7 +55,7 @@ WORKDIR /home/AqualinkD
 
 # Use githum latest 
 WORKDIR /home/
-RUN git clone https://api.github.com/repos/sfeakes/AqualinkD/releases/latest
+RUN git clone https://github.com/sfeakes/AqualinkD.git
 
 WORKDIR /home/AqualinkD
 
