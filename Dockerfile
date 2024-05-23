@@ -51,11 +51,11 @@ WORKDIR /home/AqualinkD
 #COPY . /home/AqualinkD
 
 # Use github latest release version
-#RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1
+RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1
 
 # Use githum latest 
-WORKDIR /home/
-RUN git clone https://github.com/sfeakes/AqualinkD.git
+#WORKDIR /home/
+#RUN git clone https://github.com/sfeakes/AqualinkD.git
 
 WORKDIR /home/AqualinkD
 
