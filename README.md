@@ -5,6 +5,11 @@ Please see the AqualinkD wiki docker section for how to build / deploy AqualinkD
 
 This repo simply holds docker development tools for AqualinkD and no documentation provided. look / play / re-use anything here as you desire.
 
+* Dockerfile <-- Used to build your own AqualinkD container for local deployment. 
+* Dockerfile.releaseBinaries <-- Used for compiling armhf and arm64 binaries for AqualinkD
+* Dockerfile.buildx <-- Used to create arm64 & amd64 AqalinkD containers for docker.io
+* Dockerfile.* <-- Playing / testing / previous version of above
+
 <!--
 
 Docker info for Aqualinkd  

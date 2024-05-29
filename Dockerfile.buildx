@@ -1,0 +1,185 @@
+#####################################
+#
+# Create AqualinkD container for release (includes AMD64 and ARM64 for >Pi4 with 64 bit os and Linux PC)
+# Build container for buildx
+#
+# Enable multi platform
+# docker buildx create --use --platform=linux/arm64,linux/amd64 --name multi-platform-builder
+# docker buildx inspect --bootstrap
+#
+# Build
+# docker buildx build --platform=linux/amd64,linux/arm64 --output=./crap --file /Dockerfile.buildx  .
+# docker buildx build --platform=linux/amd64,linux/arm64  --file Dockerfile.buildx .
+# adding --progress=plain helps with debug
+#
+# Clean the build env and start again
+# docker buildx prune
+#
+#
+#  docker build -f ./Dockerfile.buildrelease  .
+#
+#####################################
+
+
+FROM --platform=$BUILDPLATFORM gcc:12-bookworm AS aqualinkd-build
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG BUILDVARIANT
+ARG BUILDOS
+ARG BUILDARCH
+ARG TARGETOS
+ARG TARGETARCH
+
+# Print all buildx variables 
+RUN echo "Build Platform $BUILDPLATFORM" && \
+    echo "Target Platform $TARGETPLATFORM" && \
+    echo "Build Veriant $BUILDVARIANT" && \
+    echo "Build OS $BUILDOS" && \
+    echo "Build Arch $BUILDARCH" && \
+    echo "Tagert OS $TARGETOS" && \
+    echo "Target Arch $TARGETARCH" && \
+
+
+# Setup build env
+RUN apt-get update && \
+    apt-get install -y \
+                       build-essential \
+                       file \
+                       libsystemd-dev
+
+# Add arm64 arch and build.
+RUN dpkg --add-architecture arm64
+RUN apt-get update && \
+    apt-get install -y \
+                       libsystemd-dev:arm64 \
+                       gcc-aarch64-linux-gnu \
+                       binutils-arm-linux-gnueabi
+
+
+RUN mkdir /home/AqualinkD
+WORKDIR /home/AqualinkD
+
+# Use github latest release version of aqualinkd
+#RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1
+
+COPY ./build/AqualinkD-2.3.5/ /home/AqualinkD
+
+#RUN ls -alR
+#ARG AQUALINKD_VERSION
+#RUN export AQUALINKD_VERSION=$(cat version.h | grep AQUALINKD_VERSION | cut -d'"' -f2);echo $AQUALINKD_VERSION;
+RUN echo "AqualinkD Version $AQUALINKD_VERSION"
+
+# Make AqualinkD
+run make clean
+RUN make container-$TARGETARCH
+
+
+#####################################
+#
+# Runtime container(s)
+#
+#####################################
+
+FROM debian:bookworm-slim AS aqualinkd
+
+VOLUME ["/aqualinkd"]
+ARG AQUALINKD_VERSION
+
+ARG TARGETARCH
+
+RUN apt-get update \
+  && apt-get install -y cron curl
+ 
+# Set cron to read local.d
+RUN sed -i '/EXTRA_OPTS=.-l./s/^#//g' /etc/default/cron
+
+#Add Open Container Initiative (OCI) annotations.
+#See: https://github.com/opencontainers/image-spec/blob/main/annotations.md
+
+LABEL org.opencontainers.image.title="AqualinkD"
+LABEL org.opencontainers.image.url="https://hub.docker.com/repository/docker/sfeakes/aqualinkd/general"
+LABEL org.opencontainers.image.source="https://github.com/sfeakes/AqualinkD"
+LABEL org.opencontainers.image.documentation="https://github.com/sfeakes/AqualinkD"
+LABEL org.opencontainers.image.version=$AQUALINKD_VERSION
+
+COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd /usr/local/bin/aqualinkd                        
+COPY --from=aqualinkd-build /home/AqualinkD/release/serial_logger /usr/local/bin/serial_logger
+COPY --from=aqualinkd-build /home/AqualinkD/web/ /var/www/aqualinkd/
+COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd.conf /etc/aqualinkd.conf
+
+COPY --from=aqualinkd-build /home/AqualinkD/extras/aqualinkd-docker.cmd /usr/local/bin/aqualinkd-docker
+
+CMD ["sh", "-c", "/usr/local/bin/aqualinkd-docker"]
+
+
+
+
+
+
+
+
+
+
+#8 0.097 Build Platform linux/amd64
+#9 0.096 Build Platform linux/amd64
+#9 DONE 0.8s
+
+
+#10 0.096 Target Platform linux/amd64
+#11 0.100 Target Platform linux/arm64
+#11 DONE 0.1s
+
+#12 [linux/amd64  4/17] RUN echo "Build Veriant "
+#12 0.096 Build Veriant 
+#13 0.098 Build Veriant 
+#13 DONE 0.1s
+
+#14 [linux/amd64->arm64  5/17] RUN echo "Build OS linux"
+#14 0.079 Build OS linux
+#15 0.092 Build OS linux
+#15 DONE 0.1s
+
+#16 [linux/amd64->arm64  6/17] RUN echo "Build Arch amd64"
+#17 [linux/amd64  6/17] RUN echo "Build Arch amd64"
+#17 0.076 Build Arch amd64
+#17 DONE 0.1s
+
+#18 [linux/amd64->arm64  7/17] RUN echo "Tagert OS linux"
+#18 0.083 Tagert OS linux
+#18 DONE 0.1s
+
+#19 [linux/amd64  7/17] RUN echo "Tagert OS linux"
+#19 0.081 Tagert OS linux
+#19 DONE 0.1s
+
+#20 [linux/amd64  8/17] RUN echo "Target Arch amd64"
+#20 0.073 Target Arch amd64
+
+
+
+
+# https://depot.dev/blog/building-arm-containers
+
+#FROM --platform=$BUILDPLATFORM rust:1.61 AS rust-builder
+
+# Setup the build OS
+
+
+#FROM --platform=$BUILDPLATFORM rust-builder AS build-amd64
+
+# Compile for amd64
+
+
+#FROM --platform=$BUILDPLATFORM rust-builder AS build-arm64
+# Compile for arm 64
+
+
+#FROM --platform=amd64 debian:bullseye AS final-amd64
+#COPY --from=build-amd64 /usr/bin/example-app /usr/bin/example-app
+ 
+#FROM --platform=arm64 debian:bullseye AS final-arm64
+#COPY --from=build-arm64 /usr/bin/example-app /usr/bin/example-app
+ 
+
+#FROM final-${TARGETARCH}

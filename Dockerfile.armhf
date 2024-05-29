@@ -1,40 +1,295 @@
-#FROM debian:wheezy
-FROM gcc:8.4.0
+# Docker to make raspberry-pi release Builds for AqualinkD (armhf).
+# armv6l GNU/Linux 3.2.0
+# For ARM32 anything newer than Stretch 
+#
+# docker build -f Dockerfile.armhf -t gcc6-rpi-zero .
+# docker run -it --mount type=bind,source=./build,target=/build gcc6-rpi-zero bash
+#
+# 
+FROM debian:stretch
 
-#RUN apt-get update && apt-get -y install \
-#                        bash \
-#                        curl wget \
-#                        pkg-config build-essential make automake autogen \
-#                        tar xz-utils bzip2 gzip \
-#                        file \
-#                        rsync \
-#                        sed \
-#                        vim
+# This should match the one on your raspi
+#ENV GCC_VERSION gcc-8.3.0
+#ENV GLIBC_VERSION glibc-2.28
+#ENV BINUTILS_VERSION binutils-2.31.1
+ENV GCC_VERSION gcc-6.3.0
+ENV GLIBC_VERSION glibc-2.24
+ENV BINUTILS_VERSION binutils-2.28
+ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-RUN apt-get -y install build-essential make rsync
+RUN echo "deb http://archive.debian.org/debian stretch main\n" \
+         "deb http://archive.debian.org/debian-security stretch/updates main\n" \
+         "#deb http://archive.debian.org/debian stretch-updates main\n" > /etc/apt/sources.list
 
-ENV CROSS_TRIPLE arm-linux-gnueabihf
-ENV CROSS_TRIPLE arm-linux-gnueabihf
-ENV CROSS_ROOT /usr/${CROSS_TRIPLE}
-ENV PATH ${PATH}:${CROSS_ROOT}/bin
-ENV LD_LIBRARY_PATH ${CROSS_ROOT}/lib:${LD_LIBRARY_PATH}
-ENV RASPBERRYPI_TOOLS_COMMIT 9c3d7b6ac692498dd36fec2872e0b55f910baac1
+RUN cat /etc/apt/sources.list
 
-# Enable 32 bits binaries
-RUN dpkg --add-architecture i386 && \
-    apt-get update && \
-    apt-get install -y libstdc++6:i386 libgcc1:i386 zlib1g:i386
+# Install some tools and compilers + clean up
+RUN apt-get update && \
+    apt-get install -y rsync git wget gcc-6 g++-6 cmake gdb gdbserver bzip2 && \
+    apt-get clean autoclean && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
-# Raspberry Pi is ARMv6+VFP2, Debian armhf is ARMv7+VFP3
-# Since this Dockerfile is targeting linux-arm from Raspberry Pi onward,
-# we're sticking with it's custom built cross-compiler with hardfp support.
-# We could use Debian's armel, but we'd have softfp and loose a good deal
-# of performance.
-# See: https://wiki.debian.org/RaspberryPi
-# We are also using the 4.7 version of the toolchain, so that glibc=2.13
-RUN curl -L https://github.com/raspberrypi/tools/archive/${RASPBERRYPI_TOOLS_COMMIT}.tar.gz | tar xvz --wildcards --no-anchored "*gcc-linaro-${CROSS_TRIPLE}-raspbian*" && \
-    rsync -av /tools-${RASPBERRYPI_TOOLS_COMMIT}/arm-bcm2708/gcc-linaro-${CROSS_TRIPLE}-raspbian/* /usr && \
-    cd /usr/bin && \
-    ln -s ${CROSS_TRIPLE}-gcc ${CROSS_TRIPLE}-cc && \
-    rm -rf /tools-${RASPBERRYPI_TOOLS_COMMIT}
+
+# Use GCC 8 as the default
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 999 \
+ && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 999 \
+ && update-alternatives --install /usr/bin/cc  cc  /usr/bin/gcc-6 999 \
+ && update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-6 999
+
+# Add a user called `develop`
+RUN useradd -ms /bin/bash develop
+RUN echo "develop   ALL=(ALL:ALL) ALL" >> /etc/sudoers
+
+WORKDIR /home/develop
+
+# Download and extract GCC
+RUN wget https://ftp.gnu.org/gnu/gcc/${GCC_VERSION}/${GCC_VERSION}.tar.gz && \
+    tar xf ${GCC_VERSION}.tar.gz && \
+    rm ${GCC_VERSION}.tar.gz
+# Download and extract LibC
+RUN wget https://ftp.gnu.org/gnu/libc/${GLIBC_VERSION}.tar.bz2 && \
+    tar xjf ${GLIBC_VERSION}.tar.bz2 && \
+    rm ${GLIBC_VERSION}.tar.bz2
+# Download and extract BinUtils
+RUN wget https://ftp.gnu.org/gnu/binutils/${BINUTILS_VERSION}.tar.bz2 && \
+    tar xjf ${BINUTILS_VERSION}.tar.bz2 && \
+    rm ${BINUTILS_VERSION}.tar.bz2
+# Download the GCC prerequisites
+RUN cd ${GCC_VERSION} && contrib/download_prerequisites && rm *.tar.*
+#RUN cd gcc-9.2.0 && contrib/download_prerequisites && rm *.tar.*
+
+# Build BinUtils
+RUN mkdir -p /opt/cross-pi-gcc
+WORKDIR /home/develop/build-binutils
+RUN ../${BINUTILS_VERSION}/configure \
+        --prefix=/opt/cross-pi-gcc --target=arm-linux-gnueabihf \
+        --with-arch=armv6 --with-fpu=vfp --with-float=hard \
+        --disable-multilib
+RUN make -j$(nproc)
+RUN make install
+
+# Build the first part of GCC
+WORKDIR /home/develop/build-gcc
+RUN ../${GCC_VERSION}/configure \
+        --prefix=/opt/cross-pi-gcc \
+        --target=arm-linux-gnueabihf \
+        --enable-languages=c,c++,fortran \
+        --with-arch=armv6 --with-fpu=vfp --with-float=hard \
+        --disable-multilib \
+        --enable-linker-build-id
+RUN make -j$(nproc) 'LIMITS_H_TEST=true' all-gcc
+RUN make install-gcc
+ENV PATH=/opt/cross-pi-gcc/bin:${PATH}
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y gawk bison python3 && \
+    apt-get clean autoclean && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Download and install the Linux headers
+WORKDIR /home/develop
+RUN git clone --depth=1 https://github.com/raspberrypi/linux
+WORKDIR /home/develop/linux
+ENV KERNEL=kernel7
+RUN make ARCH=arm INSTALL_HDR_PATH=/opt/cross-pi-gcc/arm-linux-gnueabihf headers_install
+
+# Build GLIBC
+WORKDIR /home/develop/build-glibc
+RUN ../${GLIBC_VERSION}/configure \
+        --prefix=/opt/cross-pi-gcc/arm-linux-gnueabihf \
+        --build=$MACHTYPE --host=arm-linux-gnueabihf --target=arm-linux-gnueabihf \
+        --with-arch=armv6 --with-fpu=vfp --with-float=hard \
+        --with-headers=/opt/cross-pi-gcc/arm-linux-gnueabihf/include \
+        --disable-multilib libc_cv_forced_unwind=yes
+RUN make install-bootstrap-headers=yes install-headers
+RUN make -j8 csu/subdir_lib
+RUN install csu/crt1.o csu/crti.o csu/crtn.o /opt/cross-pi-gcc/arm-linux-gnueabihf/lib
+RUN arm-linux-gnueabihf-gcc -nostdlib -nostartfiles -shared -x c /dev/null \
+        -o /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/libc.so
+RUN touch /opt/cross-pi-gcc/arm-linux-gnueabihf/include/gnu/stubs.h
+
+# Continue building GCC
+WORKDIR /home/develop/build-gcc
+RUN make -j$(nproc) all-target-libgcc
+RUN make install-target-libgcc
+
+# Finish building GLIBC
+WORKDIR /home/develop/build-glibc
+RUN make -j$(nproc)
+RUN make install
+
+# Finish building GCC
+WORKDIR /home/develop/build-gcc
+RUN make -j$(nproc)
+RUN make install
+
+
+# Download systemd and it's dependancys.
+RUN mkdir -p /home/develop/packages
+WORKDIR /home/develop/packages
+
+RUN dpkg --add-architecture armhf
+RUN apt update
+
+RUN apt-get download libsystemd-dev:armhf
+RUN apt-get download libsystemd0:armhf
+RUN apt-get download libc6:armhf
+
+RUN apt-get download libgcrypt20:armhf
+RUN apt-get download liblz4-1:armhf
+RUN apt-get download liblzma5:armhf
+RUN apt-get download libselinux1:armhf 
+
+RUN apt-get download libpcre3:armhf
+RUN apt-get download libgpg-error0:armhf
+
+
+# Below is a bit of a hack, maybe come back to do this correctly, but this works.
+# Main problem is the directories in teh deb files don't match how we want to deploy.
+# Probably because we are extracting packages rather than installing them, because can't get the install working
+# on a different target arch
+
+# Install all packages into /opt/cross-pi-gcc/arm-linux-gnueabihf
+RUN for file in *; do dpkg-deb -x $file /opt/cross-pi-gcc/arm-linux-gnueabihf; done
+
+# the above will ge installed in /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/arm-linux-gnueabihf, 
+# and we need them in /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/, so make come links.
+WORKDIR /opt/cross-pi-gcc/arm-linux-gnueabihf/lib
+RUN for file in ./arm-linux-gnueabihf/*; do ln -s $file ./`basename $file` 2> /dev/null; done; exit 0
+# liblz4.so.1 is installed in a different directory, so link that as well.
+RUN ln -s /opt/cross-pi-gcc/arm-linux-gnueabihf/usr/lib/arm-linux-gnueabihf/liblz4.so.1 /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/liblz4.so.1
+
+# setup build environment
+ENV RASPBIAN_ROOTFS=$HOME/rpi/rootfs
+ENV PATH=/opt/cross-pi-gcc/bin:/opt/cross-pi-gcc/libexec/gcc/arm-linux-gnueabihf/6.3.0/:$PATH
+ENV RASPBERRY_VERSION=1
+
+ENV C_INCLUDE_PATH=/opt/cross-pi-gcc/arm-linux-gnueabihf/usr/include
+
+# Make sure we pickup the right gcc
+RUN ln -s /opt/cross-pi-gcc/bin/arm-linux-gnueabihf-gcc /opt/cross-pi-gcc/bin/gcc
+
+WORKDIR /home/develop/
+
+
+
+#RUN ln -s /opt/cross-pi-gcc/bin/arm-linux-gnueabihf-gcc /opt/cross-pi-gcc/bin/gcc
+
+
+#dpkg --add-architecture armhf
+#apt update
+
+#apt-get download libsystemd-dev:armhf
+#apt-get download libsystemd0:armhf
+#apt-get download libc6:armhf
+
+#apt-get download libgcrypt20:armhf
+#apt-get download liblz4-1:armhf
+#apt-get download liblzma5:armhf
+#apt-get download libselinux1:armhf 
+
+#apt-get download libpcre3:armhf
+#apt-get download libgpg-error0:armhf
+
+
+#dpkg-deb -x ./libsystemd-dev_232-25+deb9u12_armhf.deb /opt/cross-pi-gcc/arm-linux-gnueabihf
+#-- multiple--
+
+#cp --no-clobber /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/arm-linux-gnueabihf/* /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/
+
+#// Link outside above
+#ln -s /opt/cross-pi-gcc/arm-linux-gnueabihf/usr/lib/arm-linux-gnueabihf/liblz4.so.1 /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/liblz4.so.1
+
+#LD_LIBRARY_PATH=/opt/cross-pi-gcc/arm-linux-gnueabihf/lib:/opt/cross-pi-gcc/arm-linux-gnueabihf/lib/arm-linux-gnueabihf/:/opt/cross-pi-gcc/arm-linux-gnueabihf/usr/lib/arm-linux-gnueabihf/
+
+#RUN apt-get update
+#RUN apt-get install libsystemd-dev
+# ln -s /usr/include/systemd /opt/cross-pi-gcc/lib/gcc/arm-linux-gnueabihf/6.3.0/include/system
+
+#apt-get libsystemd-dev:armhf
+
+
+#USER develop
+
+
+#wget https://archive.debian.org/debian/pool/main/s/systemd/libsystemd-dev_232-25+deb9u12_armhf.deb
+#dpkg-deb -x ./libsystemd-dev_232-25+deb9u12_armhf.deb /opt/cross-pi-gcc/
+#dpkg --root=
+#ln -s /opt/cross-pi-gcc/lib/arm-linux-gnueabihf/libsystemd.so /opt/cross-pi-gcc/arm-linux-gnueabihf/lib/libsystemd.so
+
+
+#https://archive.debian.org/debian/pool/main/s/systemd/libsystemd0_232-25+deb9u12_armhf.deb
+
+#https://archive.debian.org/debian/pool/main/x/xz-utils/liblzma5_5.2.2-1.2+b1_armhf.deb
+
+
+#
+# List LD search path
+# /opt/cross-pi-gcc/lib/gcc/arm-linux-gnueabihf/6.3.0/../../../../arm-linux-gnueabihf/bin/ld --verbose | grep SEARCH_DIR
+#
+# List dpk content
+#  dpkg -c filename
+
+# From https://archive.debian.org/debian/dists/stretch/main/binary-armhf/Packages.xz
+# or https://archive.debian.org/debian/dists/stretch/main/binary-armhf/Packages.gz
+#Package: libsystemd-dev
+#Source: systemd
+#Version: 232-25+deb9u12
+#Installed-Size: 8723
+#Maintainer: Debian systemd Maintainers <pkg-systemd-maintainers@lists.alioth.debian.org>
+#Architecture: armhf
+#Replaces: libsystemd-daemon-dev (<< 209), libsystemd-id128-dev (<< 209), libsystemd-journal-dev (<< 209), libsystemd-login-dev (<< 209), systemd (<< 204-8)
+#Depends: libsystemd0 (= 232-25+deb9u12)
+#Breaks: libsystemd-daemon-dev (<< 209), libsystemd-id128-dev (<< 209), libsystemd-journal-dev (<< 209), libsystemd-login-dev (<< 209), systemd (<< 204-8)
+#Description: systemd utility library - development files
+#Multi-Arch: same
+#Homepage: https://www.freedesktop.org/wiki/Software/systemd
+#Description-md5: 7122bf9ab5ca8703093117a2cda0fe22
+#Tag: devel::lang:c, devel::library, implemented-in::c, role::devel-lib
+#Section: libdevel
+#Priority: optional
+#Filename: pool/main/s/systemd/libsystemd-dev_232-25+deb9u12_armhf.deb
+#Size: 1780088
+#MD5sum: e1cc3a3609ff9202fc7dda6b40767947
+#SHA256: f4346ee883b21df4a793c75b7a03eee25739cf8b69f1669659182f2469b3dcd7
+#
+#Package: libsystemd0
+#Source: systemd
+#Version: 232-25+deb9u12
+#Installed-Size: 464
+#Maintainer: Debian systemd Maintainers <pkg-systemd-maintainers@lists.alioth.debian.org>
+#Architecture: armhf
+#Pre-Depends: libc6 (>= 2.17), libgcc1 (>= 1:3.5), libgcrypt20 (>= 1.7.0), liblz4-1 (>= 0.0~r113), liblzma5 (>= 5.1.1alpha+20120614), libselinux1 (>= 2.1.9)
+#Description: systemd utility library
+#Multi-Arch: same
+#Homepage: https://www.freedesktop.org/wiki/Software/systemd
+#Description-md5: 92180a6b506aa0eff52136aeb8212dc6
+#Tag: role::shared-lib
+#Section: libs
+#Priority: optional
+#Filename: pool/main/s/systemd/libsystemd0_232-25+deb9u12_armhf.deb
+#Size: 260924
+#MD5sum: 779f12a697a65601a4b39fec17080f61
+#SHA256: 2f5eaed945b5be96f200fcbf4bac2feffc626c72623c802ada1bf5de95e9f9c3
+
+#Package: liblzma5
+#Source: xz-utils (5.2.2-1.2)
+#Version: 5.2.2-1.2+b1
+#Installed-Size: 290
+#Maintainer: Jonathan Nieder <jrnieder@gmail.com>
+#Architecture: armhf
+#Depends: libc6 (>= 2.17)
+#Description: XZ-format compression library
+#Multi-Arch: same
+#Homepage: http://tukaani.org/xz/
+#Description-md5: 0ceca09eb4ab99863be3578fa55e7d2b
+#Tag: role::shared-lib
+#Section: libs
+#Priority: required
+#Filename: pool/main/x/xz-utils/liblzma5_5.2.2-1.2+b1_armhf.deb
+#Size: 226144
+#MD5sum: 5e3eb349e709af3aa3ca36796c4c6322
+#SHA256: 17f72e2ecc4ab6879952aba8ea48c794dcb53d459315bfaea91ca55512291235

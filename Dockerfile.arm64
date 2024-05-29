@@ -1,0 +1,38 @@
+# Docker to make raspberry-pi release Builds for AqualinkD (arm64).
+# ARM aarch64 GNU/Linux 3.2.0
+# For ARM64 anything newer than Buster 
+#
+# docker build -f Dockerfile.arm64 -t gcc8-rpi-64 .
+# docker run -it --mount type=bind,source=./build,target=/build gcc8-rpi-64 bash
+#
+
+FROM debian:buster
+
+
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    gcc-aarch64-linux-gnu \
+    binutils-arm-linux-gnueabi \
+    file
+
+RUN dpkg --add-architecture arm64
+RUN apt-get update && \
+    apt-get install -y libsystemd-dev:arm64
+
+
+# armhf doesn't support hard float, so dam useless. (why even call it hf???? )   
+#RUN apt-get install -y \
+#    gcc-arm-linux-gnueabihf \
+#    binutils-arm-linux-gnueabihf
+
+#RUN dpkg --add-architecture armhf
+#RUN apt-get update && \
+#    apt-get install -y libsystemd-dev:armhf
+
+
+#arm-linux-gnueabihf-gcc
+
+# compiler is aarch64-linux-gnu-gcc
+
+ #   CC=aarch64-linux-gnu-gcc make
