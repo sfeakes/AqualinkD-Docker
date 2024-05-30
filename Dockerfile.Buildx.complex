@@ -27,30 +27,50 @@
 #FROM --platform=$BUILDPLATFORM gcc:12-bookworm AS aqualinkd-build
 FROM --platform=$BUILDPLATFORM debian:bookworm AS aqualinkd-build
 
+#ARG TARGETPLATFORM
+#ARG BUILDPLATFORM
+#ARG BUILDVARIANT
+#ARG BUILDOS
 ARG BUILDARCH
+#ARG TARGETOS
 ARG TARGETARCH
 
 # Print all buildx variables 
 RUN echo "Build Arch $BUILDARCH" && \
     echo "Tagert OS $TARGETOS"
 
-# Setup build env, using toolchain for all builds, even native, since make this Dockerfile cleaner
-# and no need to use bash if statments.
-# Need to be careful on install order, so using two commands
+#    echo "Build Platform $BUILDPLATFORM" && \
+#    echo "Target Platform $TARGETPLATFORM" && \
+#    echo "Build Veriant $BUILDVARIANT" && \
+#    echo "Build OS $BUILDOS" && \
+#    echo "Target Arch $TARGETARCH"
 
+
+# Setup build env
 RUN apt-get update && \
     apt-get install -y \
-            make \
-            gcc-aarch64-linux-gnu \
-            gcc-x86-64-linux-gnu
+                       build-essential \
+                       libsystemd-dev
 
-RUN dpkg --add-architecture arm64 && \
-    dpkg --add-architecture amd64 && \
-    apt-get update && \
-    apt-get install -y \
-            libsystemd-dev:arm64 \
-            libsystemd-dev:amd64
-            
+
+# If target is arm64 and build OS is NOT arm64, install toolchain for compiling arm64
+RUN if [ "$BUILDARCH" != "$TARGETARCH" ] && [ "$TARGETARCH" = "arm64" ]; then \
+          dpkg --add-architecture arm64 && \
+          apt-get update && \
+          apt-get install -y \
+             libsystemd-dev:arm64 \
+             gcc-aarch64-linux-gnu \
+             binutils-arm-linux-gnueabi; \
+    fi
+
+# If target is amd64 and build OS is NOT amd64, install toolchain for compiling amd64
+RUN if [ "$BUILDARCH" != "$TARGETARCH" ] && [ "$TARGETARCH" = "amd64" ]; then \
+          dpkg --add-architecture amd64 && \
+          apt-get update && \
+          apt-get install -y \
+              gcc-x86-64-linux-gnu \
+              libsystemd-dev:amd64; \
+    fi
 
 RUN mkdir /home/AqualinkD
 WORKDIR /home/AqualinkD
@@ -59,9 +79,16 @@ WORKDIR /home/AqualinkD
 #RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1   
 COPY ./build/AqualinkD-2.3.5/ /home/AqualinkD
 
+RUN echo "AqualinkD Version $AQUALINKD_VERSION"
+
 # Make AqualinkD
-RUN make clean && \
-    make container-$TARGETARCH;
+RUN make clean
+
+RUN if [ "$BUILDARCH" != "$TARGETARCH" ]; then \
+      make container-$TARGETARCH; \
+    else \
+      make container; \
+    fi
 
 #####################################
 #
@@ -70,6 +97,11 @@ RUN make clean && \
 #####################################
 
 FROM debian:bookworm-slim AS aqualinkd
+
+VOLUME ["/aqualinkd"]
+ARG AQUALINKD_VERSION
+
+ARG TARGETARCH
 
 RUN apt-get update \
   && apt-get install -y cron curl
@@ -94,7 +126,3 @@ COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd.conf /etc/aqualink
 COPY --from=aqualinkd-build /home/AqualinkD/extras/aqualinkd-docker.cmd /usr/local/bin/aqualinkd-docker
 
 CMD ["sh", "-c", "/usr/local/bin/aqualinkd-docker"]
-
-
-#WARNING: No output specified with docker-container driver. Build result will only remain in the build cache. To push result image into registry use --push or to load image into docker use --load
-#WARNING: current commit information was not captured by the build: failed to read current commit information with git rev-parse --is-inside-work-tree

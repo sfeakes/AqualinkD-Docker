@@ -1,70 +1,26 @@
 #####################################
 #
-# Build container for build or buildx
-#
-# Enable multi platform
-# docker buildx create --use --platform=linux/arm64,linux/arm/v7,linux/amd64 --name multi-platform-builder
-# docker buildx inspect --bootstrap
-#
-# Build
-# docker buildx build --platform=linux/amd64,linux/arm/v7,linux/arm64 .
-# adding --progress=plain helps with debug
-#
-# Clean the build env and start again
-# docker buildx prune
-#
-# Another clean method
-# docker system prune
-#
+# Build container
+# The most basic build for aqualinkd latest version
 #####################################
 
-FROM --platform=$BUILDPLATFORM gcc:12-bookworm AS aqualinkd-build
+FROM debian:bookworm AS aqualinkd-build
 
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
-ARG BUILDVARIANT
-ARG BUILDOS
-ARG BUILDARCH
-ARG TARGETOS
-ARG TARGETARCH
+#VOLUME ["/aqualinkd-build"]
 
-# Print all buildx variables 
-RUN echo "Build Platform $BUILDPLATFORM"
-RUN echo "Target Platform $TARGETPLATFORM"
-RUN echo "Build Veriant $BUILDVARIANT"
-RUN echo "Build OS $BUILDOS"
-RUN echo "Build Arch $BUILDARCH"
-RUN echo "Tagert OS $TARGETOS"
-RUN echo "Target Arch $TARGETARCH"
-
-
-# Install libsystemd dev
 RUN apt-get update && \
-    apt-get -y install libsystemd-dev
+    apt-get -y install build-essential libsystemd-dev
 
-
-# Get a aqualinkd into container
+# Seup working dir
 RUN mkdir /home/AqualinkD
 WORKDIR /home/AqualinkD
 
-# Use local
-#COPY . /home/AqualinkD
+# Get latest release
+RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1   
 
-# Use github latest release version
-RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1
-
-# Use githum latest 
-#WORKDIR /home/
-#RUN git clone https://github.com/sfeakes/AqualinkD.git
-
-WORKDIR /home/AqualinkD
-
-RUN export AQUALINKD_VERSION=$(cat version.h | grep AQUALINKD_VERSION | cut -d'"' -f2);echo $AQUALINKD_VERSION;
-RUN echo "AqualinkD Version $AQUALINKD_VERSION"
-
-# Make AqualinkD
-run make clean
-RUN make container
+# Build aqualinkd
+RUN make clean && \
+    make container
 
 #####################################
 #
@@ -74,15 +30,11 @@ RUN make container
 
 FROM debian:bookworm-slim AS aqualinkd
 
-#VOLUME ["/aqualinkd"]
-ARG AQUALINKD_VERSION
+#ARG AQUALINKD_VERSION
 
-#ARG TARGETARCH
-
-RUN apt-get update \
-  && apt-get install -y cron curl
- 
-RUN apt-get clean
+RUN apt-get update && \
+    apt-get install -y cron curl && \
+    apt-get clean
 
 # Set cron to read local.d
 RUN sed -i '/EXTRA_OPTS=.-l./s/^#//g' /etc/default/cron
@@ -94,14 +46,14 @@ LABEL org.opencontainers.image.title="AqualinkD"
 LABEL org.opencontainers.image.url="https://hub.docker.com/repository/docker/sfeakes/aqualinkd/general"
 LABEL org.opencontainers.image.source="https://github.com/sfeakes/AqualinkD"
 LABEL org.opencontainers.image.documentation="https://github.com/sfeakes/AqualinkD"
-LABEL org.opencontainers.image.version=$AQUALINKD_VERSION
+#LABEL org.opencontainers.image.version=$AQUALINKD_VERSION
+
 
 COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd /usr/local/bin/aqualinkd                        
 COPY --from=aqualinkd-build /home/AqualinkD/release/serial_logger /usr/local/bin/serial_logger
 COPY --from=aqualinkd-build /home/AqualinkD/web/ /var/www/aqualinkd/
 COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd.conf /etc/aqualinkd.conf
-
-COPY --from=aqualinkd-build ./home/AqualinkD/extras/aqualinkd-docker.cmd /usr/local/bin/aqualinkd-docker
+#COPY --from=aqualinkd-build /home/AqualinkD/docker/aqualinkd-docker.cmd /usr/local/bin/aqualinkd-docker
+RUN curl -s -o /usr/local/bin/aqualinkd-docker https://raw.githubusercontent.com/sfeakes/AqualinkD/master/extras/aqualinkd-docker.cmd
 
 CMD ["sh", "-c", "/usr/local/bin/aqualinkd-docker"]
-
