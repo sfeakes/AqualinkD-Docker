@@ -4,7 +4,7 @@
 # Build container to compile AqualnkD Release binaries (armhf and arm64)
 #
 # armhf is 32 bit armv6l (armhf) stretch and newer - work on all Pi's running 32bit (Pi1 to Pi4)
-# arm64 is 64 bit aarch64 buster and newer - work on Pi4 runing 64bit os
+# arm64 is 64 bit aarch64 buster and newer - work on Pi3/Pi4/2w running 64bit os
 #
 # docker build -f Dockerfile.releaseBinaries -t aqualinkd-releasebin .
 # docker run -it --mount type=bind,source=./build,target=/build aqualinkd-releasebin bash
