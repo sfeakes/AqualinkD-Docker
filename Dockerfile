@@ -19,6 +19,8 @@ WORKDIR /home/AqualinkD
 
 ARG AQUALINKD_VERSION
 
+RUN echo $AQUALINKD_VERSION
+
 RUN curl -sL "https://github.com/sfeakes/AqualinkD/archive/refs/tags/"$AQUALINKD_VERSION".tar.gz" | tar xz --strip-components=1
 
 # Get latest release
