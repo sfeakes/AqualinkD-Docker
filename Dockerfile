@@ -54,7 +54,7 @@ COPY --from=aqualinkd-build /home/AqualinkD/release/serial_logger /usr/local/bin
 COPY --from=aqualinkd-build /home/AqualinkD/web/ /var/www/aqualinkd/
 COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd.conf /etc/aqualinkd.conf
 #COPY --from=aqualinkd-build /home/AqualinkD/docker/aqualinkd-docker.cmd /usr/local/bin/aqualinkd-docker
-RUN curl -s -o /usr/local/bin/aqualinkd-docker https://raw.githubusercontent.com/sfeakes/AqualinkD/master/extras/aqualinkd-docker.cmd && \
+RUN curl -s -o /usr/local/bin/aqualinkd-docker https://raw.githubusercontent.com/sfeakes/AqualinkD/master/docker/aqualinkd-docker.cmd && \
     chmod +x /usr/local/bin/aqualinkd-docker
 
 
