@@ -7,6 +7,8 @@ services:
       context: https://github.com/sfeakes/AqualinkD-Docker.git#main
       #context: ./
       #dockerfile: ./users/Dockerfile
+      args:
+        AQUALINKD_VERSION: v2.3.6
     ports:
       - "6171:80"
     volumes:

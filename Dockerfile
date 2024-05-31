@@ -1,7 +1,9 @@
 #####################################
 #
 # Build container
-# The most basic build for aqualinkd latest version
+# The most basic build for aqualinkd specific version
+#
+# AQUALINKD_VERSION v
 #####################################
 
 FROM debian:bookworm AS aqualinkd-build
@@ -9,14 +11,18 @@ FROM debian:bookworm AS aqualinkd-build
 #VOLUME ["/aqualinkd-build"]
 
 RUN apt-get update && \
-    apt-get -y install curl build-essential libsystemd-dev
+    apt-get -y install curl make gcc libsystemd-dev
 
 # Seup working dir
 RUN mkdir /home/AqualinkD
 WORKDIR /home/AqualinkD
 
+ARG AQUALINKD_VERSION
+
+RUN curl -sL "https://github.com/sfeakes/AqualinkD/archive/refs/tags/"$AQUALINKD_VERSION".tar.gz" | tar xz --strip-components=1
+
 # Get latest release
-RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1   
+#RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1   
 
 # Build aqualinkd
 RUN make clean && \
@@ -30,7 +36,7 @@ RUN make clean && \
 
 FROM debian:bookworm-slim AS aqualinkd
 
-#ARG AQUALINKD_VERSION
+ARG AQUALINKD_VERSION
 
 # Install socat for wireless RS485 driver support
 RUN apt-get update && \
@@ -47,7 +53,7 @@ LABEL org.opencontainers.image.title="AqualinkD"
 LABEL org.opencontainers.image.url="https://hub.docker.com/repository/docker/sfeakes/aqualinkd/general"
 LABEL org.opencontainers.image.source="https://github.com/sfeakes/AqualinkD"
 LABEL org.opencontainers.image.documentation="https://github.com/sfeakes/AqualinkD"
-#LABEL org.opencontainers.image.version=$AQUALINKD_VERSION
+LABEL org.opencontainers.image.version=$AQUALINKD_VERSION
 
 
 COPY --from=aqualinkd-build /home/AqualinkD/release/aqualinkd /usr/local/bin/aqualinkd                        
