@@ -21,7 +21,7 @@ ARG AQUALINKD_VERSION
 
 RUN echo $AQUALINKD_VERSION
 
-RUN curl -sL "https://github.com/sfeakes/AqualinkD/archive/refs/tags/"$AQUALINKD_VERSION".tar.gz" | tar xz --strip-components=1
+RUN curl -sL "https://github.com/sfeakes/AqualinkD/archive/refs/tags/$AQUALINKD_VERSION.tar.gz" | tar xz --strip-components=1
 
 # Get latest release
 #RUN curl -sL $(curl -s https://api.github.com/repos/sfeakes/AqualinkD/releases/latest | grep "tarball_url" | cut -d'"' -f4) | tar xz --strip-components=1   
