@@ -32,8 +32,9 @@ FROM debian:bookworm-slim AS aqualinkd
 
 #ARG AQUALINKD_VERSION
 
+# Install socat for wireless RS485 driver support
 RUN apt-get update && \
-    apt-get install -y cron curl && \
+    apt-get install -y cron curl socat && \
     apt-get clean
 
 # Set cron to read local.d
