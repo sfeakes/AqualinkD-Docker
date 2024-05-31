@@ -9,7 +9,7 @@ FROM debian:bookworm AS aqualinkd-build
 #VOLUME ["/aqualinkd-build"]
 
 RUN apt-get update && \
-    apt-get -y install build-essential libsystemd-dev
+    apt-get -y install curl build-essential libsystemd-dev
 
 # Seup working dir
 RUN mkdir /home/AqualinkD
